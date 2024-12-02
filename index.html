@@ -1,0 +1,321 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>PNG to MP4 Converter</title>
+    <style>
+      body {
+        font-family: "Arial", sans-serif;
+        margin: 0;
+        padding: 0;
+        background-color: #f4f7fc;
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        min-height: 100vh;
+        flex-direction: column;
+      }
+      h1 {
+        font-size: 2.5rem;
+        color: #333;
+        margin-bottom: 20px;
+      }
+      .container {
+        background-color: #fff;
+        padding: 20px;
+        border-radius: 10px;
+        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+        text-align: center;
+        width: 100%;
+        max-width: 600px;
+      }
+      input[type="file"] {
+        margin: 10px 0;
+        padding: 10px;
+        font-size: 1rem;
+        border-radius: 5px;
+        border: 1px solid #ccc;
+        cursor: pointer;
+      }
+      input[type="number"] {
+        width: 80px;
+        padding: 10px;
+        font-size: 1rem;
+        margin: 10px 0;
+        border-radius: 5px;
+        border: 1px solid #ccc;
+        text-align: center;
+      }
+      button {
+        padding: 12px 20px;
+        font-size: 1.1rem;
+        background-color: #007bff;
+        color: #fff;
+        border: none;
+        border-radius: 5px;
+        cursor: pointer;
+        transition: background-color 0.3s;
+      }
+      button:hover {
+        background-color: #0056b3;
+      }
+      .file-info {
+        margin-top: 10px;
+        text-align: left;
+        font-size: 1rem;
+        color: #555;
+      }
+      .file-list {
+        list-style-type: none;
+        padding: 0;
+        margin: 10px 0;
+        display: flex;
+        flex-direction: column;
+        gap: 10px;
+        align-items: flex-start;
+      }
+      .file-item {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        width: 100%;
+        font-size: 1rem;
+        color: #555;
+        cursor: move;
+        padding: 10px;
+        background-color: #f8f9fa;
+        border-radius: 5px;
+        border: 1px solid #ddd;
+      }
+      .file-item img {
+        width: 50px;
+        height: 50px;
+        object-fit: cover;
+        margin-right: 10px;
+        border-radius: 5px;
+      }
+      .file-item:hover {
+        background-color: #e2e6ea;
+      }
+      .progress-container {
+        display: none;
+        margin: 20px 0;
+      }
+      progress {
+        width: 100%;
+        height: 20px;
+        margin-top: 10px;
+      }
+      #progressText {
+        font-size: 1.1rem;
+        margin-top: 10px;
+        color: #333;
+      }
+      #downloadLink {
+        display: none;
+        margin-top: 20px;
+        text-decoration: none;
+        color: #fff;
+        background-color: #28a745;
+        padding: 10px 20px;
+        border-radius: 5px;
+        font-size: 1.1rem;
+        transition: background-color 0.3s;
+      }
+      #downloadLink:hover {
+        background-color: #218838;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="container">
+      <h1>PNG to MP4 Converter</h1>
+
+      <!-- Progress Bar -->
+      <div class="progress-container" id="progressContainer">
+        <p id="progressText">Initializing...</p>
+        <progress id="progressBar" value="0" max="100"></progress>
+      </div>
+
+      <!-- Buttons and Input fields -->
+      <label for="imageDuration">Image Duration (seconds):</label>
+      <input type="number" id="imageDuration" value="3" min="1" />
+      <br /><br />
+      <button id="convertBtn">Convert to MP4</button>
+      <a id="downloadLink" href="#">Download MP4</a>
+      <button
+        id="switchToVideo"
+        onclick="window.location.href = 'Video to PNG.html';"
+      >
+        Switch to PNG to Video Converter
+      </button>
+
+      <!-- File input and file list -->
+      <input type="file" id="imageInput" accept="image/png" multiple />
+      <div class="file-info" id="fileInfo"></div>
+      <ul class="file-list" id="fileList"></ul>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/@ffmpeg/ffmpeg@0.10.0/dist/ffmpeg.min.js"></script>
+    <script>
+      let fileArray = [];
+
+      document.getElementById("imageInput").addEventListener("change", (e) => {
+        const files = Array.from(e.target.files);
+        fileArray = files.map((file, index) => ({ file, index }));
+        displayFileList();
+      });
+
+      function displayFileList() {
+        const fileListContainer = document.getElementById("fileList");
+        fileListContainer.innerHTML = "";
+
+        // Create list items with thumbnails for each selected file
+        fileArray.forEach((fileObj, idx) => {
+          const listItem = document.createElement("li");
+          listItem.className = "file-item";
+          listItem.draggable = true;
+          listItem.dataset.index = idx;
+
+          // Create the thumbnail image for the file
+          const img = document.createElement("img");
+          const reader = new FileReader();
+
+          reader.onload = (e) => {
+            img.src = e.target.result;
+          };
+
+          reader.readAsDataURL(fileObj.file);
+
+          // Create the file name span
+          const fileName = document.createElement("span");
+          fileName.textContent = fileObj.file.name;
+
+          listItem.appendChild(img);
+          listItem.appendChild(fileName);
+          fileListContainer.appendChild(listItem);
+
+          listItem.addEventListener("dragstart", handleDragStart);
+          listItem.addEventListener("dragover", handleDragOver);
+          listItem.addEventListener("drop", handleDrop);
+          listItem.addEventListener("dragend", handleDragEnd);
+        });
+
+        // Display selected files in file-info section
+        const fileInfo = document.getElementById("fileInfo");
+        const fileNames = fileArray
+          .map((fileObj) => fileObj.file.name)
+          .join(", ");
+        fileInfo.textContent = `Selected Files: ${fileNames}`;
+      }
+
+      function handleDragStart(e) {
+        const index = parseInt(e.target.dataset.index, 10);
+        e.dataTransfer.setData("text/plain", index);
+      }
+
+      function handleDragOver(e) {
+        e.preventDefault();
+        e.target.style.backgroundColor = "#e2e6ea";
+      }
+
+      function handleDrop(e) {
+        e.preventDefault();
+        const fromIndex = parseInt(e.dataTransfer.getData("text/plain"), 10);
+        const toIndex = parseInt(e.target.dataset.index, 10);
+
+        if (fromIndex === toIndex) return;
+
+        // Swap elements in fileArray
+        const movedItem = fileArray.splice(fromIndex, 1)[0];
+        fileArray.splice(toIndex, 0, movedItem);
+
+        // Update the list UI
+        displayFileList();
+      }
+
+      function handleDragEnd(e) {
+        e.target.style.backgroundColor = "#f8f9fa";
+      }
+
+      document
+        .getElementById("convertBtn")
+        .addEventListener("click", async () => {
+          const { createFFmpeg, fetchFile } = FFmpeg;
+          const ffmpeg = createFFmpeg({ log: true });
+
+          const imageDuration = document.getElementById("imageDuration").value;
+          const progressContainer =
+            document.getElementById("progressContainer");
+          const progressBar = document.getElementById("progressBar");
+          const progressText = document.getElementById("progressText");
+          const downloadLink = document.getElementById("downloadLink");
+
+          if (!fileArray.length) {
+            alert("Please select some PNG images.");
+            return;
+          }
+
+          // Show the progress container and hide the file input
+          progressContainer.style.display = "block";
+          progressBar.value = 0;
+          progressText.textContent = "Loading FFmpeg...";
+
+          // Load FFmpeg
+          await ffmpeg.load();
+          progressBar.value = 20;
+
+          // Add each image to the FFmpeg file system
+          progressText.textContent = "Uploading images...";
+          for (const [index, { file }] of fileArray.entries()) {
+            ffmpeg.FS(
+              "writeFile",
+              `image${index}.png`,
+              new Uint8Array(await file.arrayBuffer())
+            );
+          }
+          progressBar.value = 40;
+
+          // Create a text file listing input images with durations
+          progressText.textContent = "Preparing files...";
+          const fileList = fileArray
+            .map(
+              (_, index) => `file image${index}.png\nduration ${imageDuration}`
+            )
+            .join("\n");
+          ffmpeg.FS(
+            "writeFile",
+            "filelist.txt",
+            new TextEncoder().encode(fileList)
+          );
+
+          // Concatenate images into a video
+          progressText.textContent = "Processing images into MP4...";
+          await ffmpeg.run(
+            "-f",
+            "concat",
+            "-safe",
+            "0",
+            "-i",
+            "filelist.txt",
+            "-vf",
+            `fps=30,format=yuv420p`,
+            "output.mp4"
+          );
+          progressBar.value = 80;
+
+          // Retrieve the output MP4 file and create the download link
+          const data = ffmpeg.FS("readFile", "output.mp4");
+          const videoBlob = new Blob([data.buffer], { type: "video/mp4" });
+          const videoUrl = URL.createObjectURL(videoBlob);
+
+          progressText.textContent = "Conversion complete!";
+          downloadLink.href = videoUrl;
+          downloadLink.download = "output.mp4";
+          downloadLink.style.display = "block";
+          progressBar.value = 100;
+        });
+    </script>
+  </body>
+</html>
